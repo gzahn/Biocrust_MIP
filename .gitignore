@@ -1,0 +1,15 @@
+# taxonomy database
+taxonomy/Eukaryome_General_SSU_v1.8_reformatted_VTX.fasta.gz
+
+# seq data
+data/seq/18S
+data/seq/16S
+data/seq/ITS
+
+
+# big files
+data/ASV_Tables/*dada*
+data/ASV_Tables/*err*
+
+
+.Rproj.user
