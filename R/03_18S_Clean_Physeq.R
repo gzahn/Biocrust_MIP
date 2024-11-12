@@ -57,9 +57,22 @@ ps@sam_data <- ps@sam_data[,grep("path",ps@sam_data %>% names,invert = TRUE)]
 # convert factors
 ps@sam_data$invasion <- factor(ps@sam_data$invasion,levels=c("Native","Transition","Invaded"))
 
-# convert NA taxonomy to "unclassified"
-ps@tax_table[,5][is.na(ps@tax_table[,5])] <- "unclassified"
-ps@tax_table[,6][is.na(ps@tax_table[,6])] <- "unclassified"
+
+# build better species-level names
+ps <- 
+  ps %>% 
+  make_sane_taxa_names()
+
+# add plant data
+V <- ps@sam_data$sample_id %>% grepl(pattern="V$")
+P <- ps@sam_data$sample_id %>% grepl(pattern="P$")
+ps@sam_data <- 
+  ps@sam_data %>% 
+  as('data.frame') %>% 
+  mutate(plant=case_when(V ~ "V",
+                         P ~ "P")) %>% 
+  sample_data()
+
 
 # SAVE CLEAN PHYSEQ ####
 saveRDS(ps,"./data/physeq_18S_clean.RDS")

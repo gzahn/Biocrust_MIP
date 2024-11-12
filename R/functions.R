@@ -658,3 +658,42 @@ googlemap_json_to_string <-
     style_string <- gsub("[|]", "%7C", style_string)
     return(style_string)
   }
+
+# make_sane_taxa_names() ####
+
+make_sane_taxa_names <- function(x,na.term="unclassified"){
+  # x is a phyloseq object
+  # functions returns same physeq object but with "Species" names as the best
+  # possible (lowest rank) name based on classification resolution
+  # e.g., Glomus sp. or Glomeraceae sp.
+  
+  tax <- x %>% tax_table() %>% as.data.frame()
+  tax[is.na(tax)] <- na.term
+  new.sp.name <- 
+    tax %>% 
+    mutate(Class = if_else(Class == na.term,Phylum,Class),
+           Order = if_else(Order == na.term,Class,Order),
+           Family = if_else(Family == na.term,Order,Family),
+           Genus = if_else(Genus == na.term,Family,Genus),
+           Species = if_else(Species == na.term,"sp.",Species)
+    ) %>% 
+    mutate(new_sp_name = paste(Genus,Species)) %>% 
+    pluck("new_sp_name")
+  x@tax_table[,7] <- new.sp.name
+  return(x)
+}
+
+# capture_mods() ####
+# for working with corncob output
+# pull out tidy model results for each taxon
+capture_mods <- function(x){
+  y.names <- row.names(x$coefficients)
+  y <- x$coefficients %>% 
+    as.data.frame() %>%
+    janitor::clean_names()
+  names(y) <- c("estimate","std_error","t_value","p_value")
+  y <- y %>% 
+    mutate(p_value = p_value %>% round(6),
+           term = row.names(.))
+  return(y)
+}
