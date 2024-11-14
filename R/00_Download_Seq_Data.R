@@ -19,10 +19,11 @@ dl_filenames_fwd <- paste0(accessions_18S,"_1.fastq")
 dl_filenames_rev <- paste0(accessions_18S,"_2.fastq")
 
 # Download from SRA ####
-
+system("which ls")
+system2("which",args = "ls")
 ## 18S ####
 for(i in seq_along(accessions_18S)){
-  system2("fasterq-dump",args = accessions_18S[i])
+  system2(fasterq_dump,args = accessions_18S[i])
   system2("gzip", args = c(dl_filenames_fwd[i]))
   system2("gzip", args = c(dl_filenames_rev[i]))
   file.rename(paste0(dl_filenames_fwd[i],".gz"),fwd_filenames_18S[i])
