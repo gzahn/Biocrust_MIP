@@ -45,6 +45,8 @@ ps %>%
         axis.title.y = element_text(face='bold',size=14))
 ggsave("./output/figs/18S_ASV_Richness_Boxplot_by_site-invasion.png")
 
+
+
 # look at just transition plots (and plant types in them)
 ps %>% 
   subset_samples(invasion == "Transition") %>% 
@@ -87,7 +89,7 @@ dat %>%
   geom_boxplot() +
   facet_wrap(~site,scales = 'free') +
   scale_fill_manual(values=pal$pal.earthtones) +
-  labs(fill="Invasion\nstatus",y="Species richness") 
+  labs(fill="Invasion\nstatus",y="ASV richness") 
 ggsave("./output/figs/18S_ASV_Richness_Boxplot.png")
 dat %>% 
   ggplot(aes(x=crust,y=species_richness,fill=invasion)) +
@@ -96,6 +98,25 @@ dat %>%
   scale_fill_manual(values=pal$pal.earthtones) +
   labs(fill="Invasion\nstatus",y="Species richness") 
 ggsave("./output/figs/18S_Species_Richness_Boxplot.png")
+
+# boxplot to match Rae's figure 2
+
+dat %>% 
+  ggplot(aes(x=invasion,y=species_richness,color=crust,fill=crust)) +
+  geom_boxplot(alpha=.5) +
+  # facet_wrap(~invasion,scales = 'free_x') +
+  labs(y="Species richness",x="",color="Biocrust",fill="Biocrust") +
+  scale_color_manual(values = pal$pal.okabe) +
+  scale_fill_manual(values = pal$pal.okabe) +
+  theme(axis.text.x = element_text(face='bold',angle=0,size=14,hjust=.5),
+        axis.text.y = element_text(face='bold',size=10),
+        axis.title.y = element_text(face='bold',size=14),
+        plot.title = element_blank(),
+        strip.text = element_blank(),
+        legend.text = element_text(face='bold',size=12),
+        legend.title = element_text(face='bold',size=14))
+ggsave("./output/figs/18S_Species_Richness_Boxplot_by_Crust_and_Invasion.png",height = 8,width = 8)
+
 
 dat %>% 
   lmer(data=.,formula=species_richness ~ invasion * crust + (1|site)) %>% 

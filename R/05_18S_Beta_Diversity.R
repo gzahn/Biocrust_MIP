@@ -8,15 +8,20 @@ library(lmerTest)
 library(corncob)
 library(patchwork)
 library(broom)
+library(gdm)
 
 # functions
 source("./R/functions.R")
 
+# variables
+set.seed(666)
+
 # theme
-theme_set(theme_minimal() +
+theme_set(theme_bw() +
             theme(strip.text = element_text(face='bold',size=14),
                   legend.title = element_text(face='bold',size=14),
-                  axis.title = element_text(face='bold',size=14)
+                  axis.title = element_text(face='bold',size=14),
+                  axis.text = element_text(face='bold',size=10)
             )
           )
 
@@ -55,6 +60,7 @@ data.frame(site=ps@sam_data$site,
   facet_wrap(~site,scales = 'free') +
   scale_color_manual(values = pal$pal.earthtones) +
   labs(color="Invasion\nstatus")
+
 ggsave("./output/figs/18S_NMDS_Plot_site_by_invasion.png", height = 8,width = 10)
 
 data.frame(site=ps@sam_data$site,
@@ -70,7 +76,7 @@ data.frame(site=ps@sam_data$site,
   facet_wrap(~site,scales = 'free') +
   scale_color_manual(values = pal$pal.okabe) +
   labs(color="Plant",title = "Transition plots only")
-
+ggsave("./output/figs/18S_NMDS_Plot_transitionplots_by_plant.png",height = 8, width = 10)
 # PermANOVA ####
 perm.mod <- 
   adonis2(mat ~ ps@sam_data$invasion * ps@sam_data$crust, strata = ps@sam_data$site) %>% 
@@ -79,6 +85,239 @@ perm.mod <-
 perm.mod
 perm.mod %>% 
   write_csv("./output/18S_PermANOVA_Table.csv")
+
+
+# GDM MODEL ####
+# extract species by site info
+ps_melt <- 
+  ps %>% 
+  tax_glom("Species",NArm = FALSE,
+           bad_empty = c("unclassified","", " ", "\t","sp.",NA)) %>% 
+  transform_sample_counts(ra) %>% 
+  psmelt()
+names(ps_melt)
+
+# biological data
+# get columns with xy, site ID, and species data
+sppTab <- ps_melt %>% dplyr::select(OTU,Sample,longitude,latitude,site,invasion,crust,Abundance)
+sppTab_native <- ps_melt %>% dplyr::select(OTU,Sample,longitude,latitude,site,invasion,crust,Abundance) %>% 
+  dplyr::filter(invasion == "Native")
+sppTab_transition <- ps_melt %>% dplyr::select(OTU,Sample,longitude,latitude,site,invasion,crust,Abundance) %>% 
+  dplyr::filter(invasion == "Transition")
+sppTab_invaded <- ps_melt %>% dplyr::select(OTU,Sample,longitude,latitude,site,invasion,crust,Abundance) %>% 
+  dplyr::filter(invasion == "Invaded")
+
+
+# get columns with site ID, env. data, and xy-coordinates
+envTab <- ps_melt %>% dplyr::select(Sample,longitude,latitude,31:45)
+envTab_native <- ps_melt %>% dplyr::filter(invasion == "Native") %>% dplyr::select(Sample,longitude,latitude,31:45)
+envTab_transition <- ps_melt %>% dplyr::filter(invasion == "Transition") %>% dplyr::select(Sample,longitude,latitude,31:45)
+envTab_invaded <- ps_melt %>% dplyr::filter(invasion == "Invaded") %>% dplyr::select(Sample,longitude,latitude,31:45)
+
+
+
+# format for gdm
+gdmTab <- formatsitepair(bioData=sppTab, 
+                              bioFormat=2, #x-y spp list
+                              XColumn="longitude", 
+                              YColumn="latitude",
+                              sppColumn="OTU", 
+                              siteColumn="Sample", 
+                              predData=envTab,
+                              abundance = TRUE,
+                              abundColumn = "Abundance")
+gdmTab_native <- formatsitepair(bioData=sppTab_native, 
+                         bioFormat=2, #x-y spp list
+                         XColumn="longitude", 
+                         YColumn="latitude",
+                         sppColumn="OTU", 
+                         siteColumn="Sample", 
+                         predData=envTab_native,
+                         abundance = TRUE,
+                         abundColumn = "Abundance")
+gdmTab_transition <- formatsitepair(bioData=sppTab_transition, 
+                         bioFormat=2, #x-y spp list
+                         XColumn="longitude", 
+                         YColumn="latitude",
+                         sppColumn="OTU", 
+                         siteColumn="Sample", 
+                         predData=envTab_transition,
+                         abundance = TRUE,
+                         abundColumn = "Abundance")
+gdmTab_invaded <- formatsitepair(bioData=sppTab_invaded, 
+                         bioFormat=2, #x-y spp list
+                         XColumn="longitude", 
+                         YColumn="latitude",
+                         sppColumn="OTU", 
+                         siteColumn="Sample", 
+                         predData=envTab_invaded,
+                         abundance = TRUE,
+                         abundColumn = "Abundance")
+
+# fit GDM models
+gdm <- gdm(data = gdmTab,geo = TRUE)
+gdm_native <- gdm(data = gdmTab_native,geo = TRUE)
+gdm_transition <- gdm(data = gdmTab_transition,geo = TRUE)
+gdm_invaded <- gdm(data = gdmTab_invaded,geo = TRUE)
+
+# quick look at model fits
+summary(gdm)
+
+# predictions from model (using same distances)
+gdm_pred <- predict(object=gdm, data=gdmTab)
+gdm_pred_native <- predict(object=gdm_native, data=gdmTab_native)
+gdm_pred_transition <- predict(object=gdm_transition, data=gdmTab_transition)
+gdm_pred_invaded <- predict(object=gdm_invaded, data=gdmTab_invaded)
+
+
+preds <- data.frame(observed = gdmTab$distance,
+                         predicted = gdm_pred,
+                         dist = gdm$ecological,gdmTab)
+preds_native <- data.frame(observed = gdmTab_native$distance,
+                    predicted = gdm_pred_native,
+                    dist = gdm_native$ecological,gdmTab_native)
+preds_transition <- data.frame(observed = gdmTab_transition$distance,
+                    predicted = gdm_pred_transition,
+                    dist = gdm_transition$ecological,gdmTab_transition)
+preds_invaded <- data.frame(observed = gdmTab_invaded$distance,
+                    predicted = gdm_pred_invaded,
+                    dist = gdm_invaded$ecological,gdmTab_invaded)
+
+p1 <- preds %>% 
+  ggplot(aes(x=observed,y=predicted)) +
+  geom_point() +
+  geom_smooth() + ggtitle("Overall")
+p2 <- preds_native %>% 
+  ggplot(aes(x=observed,y=predicted)) +
+  geom_point() +
+  geom_smooth() + ggtitle("Native")
+p3 <- preds_transition %>% 
+  ggplot(aes(x=observed,y=predicted)) +
+  geom_point() +
+  geom_smooth() + ggtitle("Transition")
+p4 <- preds_invaded %>% 
+  ggplot(aes(x=observed,y=predicted)) +
+  geom_point() +
+  geom_smooth() + ggtitle("Invaded")
+(p1 + p2) / (p3 + p4)
+ggsave("./output/figs/18S_GDM_Prediction_Fit.png")
+
+
+## Extract splines ####
+isplines <- gdm::isplineExtract(gdm) %>% as.data.frame()
+isplines_native <- gdm::isplineExtract(gdm_native) %>% as.data.frame()
+isplines_transition <- gdm::isplineExtract(gdm_transition) %>% as.data.frame()
+isplines_invaded <- gdm::isplineExtract(gdm_invaded) %>% as.data.frame()
+
+names(isplines)
+newnames <- c("geographic_actual","NO3_actual","NH4_actual","K_actual","P_actual","OM_actual",
+              "pH_actual","Ca_actual","Mg_actual","Na_actual","SO4_actual","B_actual",
+              "Zn_actual","Mn_actual","Cu_actual","Fe_actual",
+              "geographic_partial","NO3_partial","NH4_partial","K_partial","P_partial","OM_partial",
+              "pH_partial","Ca_partial","Mg_partial","Na_partial","SO4_partial","B_partial",
+              "Zn_partial","Mn_partial","Cu_partial","Fe_partial")
+names(isplines) <- newnames
+names(isplines_native) <- newnames
+names(isplines_transition) <- newnames
+names(isplines_invaded) <- newnames
+
+isplines <- 
+isplines %>% 
+  mutate(group="Overall") %>% 
+  full_join(mutate(isplines_native,group="Native")) %>% 
+  full_join(mutate(isplines_transition,group="Transition")) %>% 
+  full_join(mutate(isplines_invaded,group="Invaded")) %>% 
+  mutate(group=factor(group,levels=c('Overall','Native','Transition',"Invaded")))
+
+
+
+## Plot splines ####
+
+gdm %>% summary
+
+top_predictors <- # contributing at least 5% explanatory power overall
+  data.frame(
+    coefs=gdm$coefficients,
+    predictor=rep(gdm$predictors,each=3)
+  ) %>% 
+  group_by(predictor) %>% 
+  summarize(sum_coef=sum(coefs)) %>% 
+  arrange(desc(sum_coef)) %>% 
+  dplyr::filter(sum_coef > 0.05 | predictor == "Geographic") # but also include geog dist
+top_predictors$predictor
+
+p1 <- isplines %>% 
+  ggplot(aes(x=geographic_actual*10000,y=geographic_partial,color=group)) +
+  geom_smooth(se=FALSE,linewidth=2,alpha=.75,aes(linetype=group)) +
+  scale_color_manual(values=c("gray20",pal$pal.earthtones)) +
+  labs(y="f(Geographic distance)",x="Geographic distance (m)",color="Taxa") +
+  scale_linetype_manual(values = c(21,1,1,1)) + guides(linetype = "none")
+
+
+p2 <- isplines %>% 
+  ggplot(aes(x=Ca_actual,y=Ca_partial,color=group)) +
+  # geom_vline(xintercept = 100,linetype=2,color='gray') +
+  geom_smooth(se=FALSE,linewidth=2,alpha=.75,aes(linetype=group)) +
+  scale_color_manual(values=c("gray20",pal$pal.earthtones)) +
+  # facet_wrap(~group) +
+  labs(y="f(Ca)",x="Ca",color="Treatment") +
+  scale_linetype_manual(values = c(21,1,1,1)) + guides(linetype = "none")
+
+
+p3 <- isplines %>% 
+  ggplot(aes(x=NO3_actual,y=NO3_partial,color=group)) +
+  # geom_vline(xintercept = 100,linetype=2,color='gray') +
+  geom_smooth(se=FALSE,linewidth=2,alpha=.75,aes(linetype=group)) +
+  scale_color_manual(values=c("gray20",pal$pal.earthtones)) +
+  # facet_wrap(~group) +
+  labs(y="f(NO3)",x="NO3",color="Treatment") +
+  scale_linetype_manual(values = c(21,1,1,1)) + guides(linetype = "none")
+
+
+p4 <- isplines %>% 
+  ggplot(aes(x=P_actual,y=P_partial,color=group)) +
+  # geom_vline(xintercept = 100,linetype=2,color='gray') +
+  geom_smooth(se=FALSE,linewidth=2,alpha=.75,aes(linetype=group)) +
+  scale_color_manual(values=c("gray20",pal$pal.earthtones)) +
+  # facet_wrap(~group) +
+  labs(y="f(P)",x="P",color="Treatment") +
+  scale_linetype_manual(values = c(21,1,1,1)) + guides(linetype = "none")
+
+
+p5 <- isplines %>% 
+  ggplot(aes(x=pH_actual,y=pH_partial,color=group)) +
+  # geom_vline(xintercept = 100,linetype=2,color='gray') +
+  geom_smooth(se=FALSE,linewidth=2,alpha=.75,aes(linetype=group)) +
+  scale_color_manual(values=c("gray20",pal$pal.earthtones)) +
+  # facet_wrap(~group) +
+  labs(y="f(pH)",x="pH",color="Treatment") +
+  scale_linetype_manual(values = c(21,1,1,1)) + guides(linetype = "none")
+
+
+p6 <- isplines %>% 
+  ggplot(aes(x=Mg_actual,y=Mg_partial,color=group)) +
+  # geom_vline(xintercept = 100,linetype=2,color='gray') +
+  geom_smooth(se=FALSE,linewidth=2,alpha=.75,aes(linetype=group)) +
+  scale_color_manual(values=c("gray20",pal$pal.earthtones)) +
+  # facet_wrap(~group) +
+  labs(y="f(Mg)",x="Mg",color="Treatment") +
+  scale_linetype_manual(values = c(21,1,1,1)) + guides(linetype = "none")
+
+
+p7 <- isplines %>% 
+  ggplot(aes(x=Fe_actual,y=Fe_partial,color=group)) +
+  # geom_vline(xintercept = 100,linetype=2,color='gray') +
+  geom_smooth(se=FALSE,linewidth=2,alpha=.75,aes(linetype=group)) +
+  scale_color_manual(values=c("gray20",pal$pal.earthtones)) +
+  # facet_wrap(~group) +
+  labs(y="f(Fe)",x="Fe",color="Treatment") +
+  scale_linetype_manual(values = c(21,1,1,1)) + guides(linetype = "none")
+
+
+
+(p2 | p3) / (p4 | p5) / (p6 | p7) + plot_layout(guides='collect')
+ggsave("./output/figs/GDM_splines_plots_soilvars.png",dpi=400,height = 8,width = 12)
+
 
 
 # DIFFABUND ####

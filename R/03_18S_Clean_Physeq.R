@@ -15,15 +15,17 @@ ps <-
   ps %>% 
   subset_taxa(Phylum == "p__Glomeromycota")
 
+
+
 # CHECK POS CONTROLS ####
 
 # add pos control designations based on 'note' column 
-ps@sam_data$control <- !is.na(ps@sam_data$note)
-
+# identify pos controls
+ps@sam_data$pos_ctl <- grepl(pattern="Mycobloom|^NC",ps@sam_data$sample_id)
 pos <- 
   ps %>% 
   transform_sample_counts(ra) %>% 
-  subset_samples(control)
+  subset_samples(pos_ctl)
 keepers <- taxa_sums(pos) > 0
 names(keepers) <- NULL
 pos %>% 
@@ -35,7 +37,7 @@ ggsave("./output/figs/18S_positive_control_barchart.png")
 # remove positive controls
 ps <- 
   ps %>% 
-  subset_samples(control == FALSE)
+  subset_samples(pos_ctl == FALSE)
 # remove empty taxa 
 ps <- 
   ps %>% 
@@ -52,7 +54,7 @@ ps <- clean_ps_taxonomy(ps)
 ps@sam_data$note <- NULL
 ps@sam_data$run <- NULL
 ps@sam_data$control <- NULL
-ps@sam_data <- ps@sam_data[,grep("path",ps@sam_data %>% names,invert = TRUE)]
+
 
 # convert factors
 ps@sam_data$invasion <- factor(ps@sam_data$invasion,levels=c("Native","Transition","Invaded"))
@@ -73,6 +75,16 @@ ps@sam_data <-
                          P ~ "P")) %>% 
   sample_data()
 
+
+# class conversions
+apply(as(ps@sam_data,'data.frame'),2,class)
+num_cols <- names(ps@sam_data)[c(12,13,21:92)]
+meta  <- ps@sam_data %>% as('data.frame')
+sam_dat <- 
+  meta %>% 
+  mutate(across(all_of(num_cols),as.numeric)) %>% 
+  sample_data()
+ps@sam_data <- sam_dat
 
 # SAVE CLEAN PHYSEQ ####
 saveRDS(ps,"./data/physeq_18S_clean.RDS")

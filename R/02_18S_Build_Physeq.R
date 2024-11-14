@@ -12,15 +12,13 @@ source("./R/functions.R")
 
 # metadata
 # sample metadata and filepaths
-metadata <- read_xlsx("./data/Palouse2021_18S_sequencing_metadata.xlsx") %>% 
+metadata <- 
+  read_xlsx("./data/full_metadata.xlsx") %>% 
   janitor::clean_names() %>% 
-  dplyr::filter(sample != "Rhizosphere") %>%  # leave out rhizosphere data from this analysis
-  mutate(fwd_18s_filepath = file.path("./data/seq/18S",fwd_18s_filepath), # add paths to file names
-         rev_18s_filepath = file.path("./data/seq/18S",rev_18s_filepath)) %>% 
-  dplyr::rename("crust" = "sample", # change column names to be more intuitive
-                "invasion" = "treatment")
-
-# add more metadata
+  mutate(fwd_18s_filepath = file.path("./data/seq/18S",fwd_name), # add paths to file names
+         rev_18s_filepath = file.path("./data/seq/18S",rev_name))
+names(metadata)
+  # add more metadata
 metadata$amplicon <- "SSU"
 metadata$run <- 1
 
@@ -31,7 +29,7 @@ metadata$cutadapt_fwd_paths <- paste0(cutadapt_dir,"/",metadata$sample_id,"_cuta
 metadata$cutadapt_rev_paths <- paste0(cutadapt_dir,"/",metadata$sample_id,"_cutadapt_rev.fastq.gz")
 
 # subset metadata to samples clearly present in cutadapt
-metadata <- metadata[file.exists(metadata$cutadapt_fwd_paths),]
+# metadata <- metadata[file.exists(metadata$cutadapt_fwd_paths),]
 
 # add control column
 metadata$control <- FALSE
@@ -79,9 +77,9 @@ tax <- assign_taxonomy_to_asv_table(asv.table=seqtab.nochim,
                                     random.seed=666,
                                     try.rc = TRUE,
                                     min.boot=50)
-# export as RDS
+# export as RDS / reload point
 saveRDS(tax,outfile)
-
+tax <- readRDS(outfile)
 # BUILD PHYSEQ ####
 
 # metadata
@@ -94,13 +92,17 @@ meta <- meta[grep("^NEG|^BLANK",sample_names(meta),invert = TRUE),]
 # tax table
 taxa <- tax_table(tax)
 
+# reorder seqtab to match metadata
+seqtab.nochim <- seqtab.nochim[meta$sample_id,]
+
 # asv table
 asv <- otu_table(seqtab.nochim,taxa_are_rows = FALSE)
 sample_names(asv)
+
+
 
 if(identical(sample_names(asv),sample_names(meta))){
   ps <- phyloseq(meta,taxa,asv)
 } else (cat("Check sample names match"))
 
-ps
 saveRDS(ps,"./data/physeq_18S_not_cleaned.RDS")
