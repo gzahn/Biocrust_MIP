@@ -381,7 +381,7 @@ joined_mods <- bbdml_mods %>%
 joined_mods$taxon <- names(bbdml_mods)
 
 # just look at sig. taxa in barplot
-mergevar <- paste(ps_sig@sam_data$site,ps_sig@sam_data$invasion,sep="_")
+mergevar <- paste(ps@sam_data$site,ps@sam_data$invasion,sep="_")
 ps@sam_data$mergevar <- mergevar
 ps_sig <- 
   ps %>% 
@@ -396,8 +396,9 @@ ps_sig <-
   subset_samples(sample_sums(ps_sig) > 0)
 ps_sig %>% 
   plot_bar2(fill="Species") +
-  facet_wrap(~invasion,scales = 'free_x')
-
+  facet_wrap(~invasion,scales = 'free_x') +
+  scale_fill_viridis_d(option='turbo')
+ggsave("./output/figs/significantly_different_taxa_relabund_barplot.png", height = 8, width = 10)
 
 sig_melt <- 
   ps_sig %>% 
@@ -412,3 +413,11 @@ sig_melt$invasion <- sig_melt$invasion %>% factor(levels = c("Native","Transitio
 sig_melt %>% 
   ggplot(aes(x=Abundance,y=Species)) +
   geom_boxplot(aes(color=invasion))
+
+sig_melt
+joined_mods %>% 
+  mutate(term = term %>% str_remove_all("mu.") %>% 
+           str_remove_all("invasion") %>% 
+           str_remove_all("site")) %>% 
+  mutate(across(where(is.numeric),function(x){round(x,4)})) %>% 
+  write_csv("./output/significant_taxa_stats_table.csv")
