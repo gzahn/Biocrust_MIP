@@ -415,9 +415,14 @@ sig_melt %>%
   geom_boxplot(aes(color=invasion))
 
 sig_melt
-joined_mods %>% 
+joined_mods <- 
+  joined_mods %>% 
   mutate(term = term %>% str_remove_all("mu.") %>% 
            str_remove_all("invasion") %>% 
            str_remove_all("site")) %>% 
-  mutate(across(where(is.numeric),function(x){round(x,4)})) %>% 
+  mutate(across(where(is.numeric),function(x){round(x,4)})) 
+joined_mods %>% 
   write_csv("./output/significant_taxa_stats_table.csv")
+joined_mods %>% 
+  mutate(taxon = taxon %>% 
+           sub(".*_", "", .))
