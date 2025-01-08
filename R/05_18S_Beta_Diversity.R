@@ -62,6 +62,20 @@ data.frame(site=ps@sam_data$site,
   labs(color="Invasion\nstatus") +
   theme(strip.background = element_blank(), legend.text = element_text(face='bold',size=12))
 
+p <- data.frame(site=ps@sam_data$site,
+           invasion=ps@sam_data$invasion,
+           crust=ps@sam_data$crust,
+           MDS1=ord$points[,1],
+           MDS2=ord$points[,2]) %>% 
+  ggplot(aes(x=MDS1,y=MDS2,color=invasion)) +
+  geom_point(size=3) +
+  stat_ellipse(linetype=2) + 
+  facet_wrap(~site,scales = 'free') +
+  scale_color_manual(values=c("#6E016B","#9EBCDA","gray")) +
+  labs(color="Invasion\nstatus") +
+  theme(strip.background = element_blank(), legend.text = element_text(face='bold',size=12))
+colorblindr::cvd_grid(p)
+
 ggsave("./output/figs/18S_NMDS_Plot_site_by_invasion.png", height = 8,width = 10)
 
 data.frame(site=ps@sam_data$site,
@@ -372,7 +386,7 @@ dat %>%
   labs(x="Model estimate",y="Taxa",color="Effect of\n invasion",
        caption = "corncob model results showing differential abundance parameter estimates\nfor taxa with significant differences (P<0.05) from Native plots.") +
   scale_color_manual(values = c("black","gray","#F0027F")) +
-  theme(axis.text.y = element_text(face='bold.italic',size=7))
+  theme(axis.text.y = element_text(face='bold.italic',size=7), strip.background = element_blank())
 
 ggsave("./output/figs/18S_Sig-Diff_Taxa__by_site_Plot.png",height = 16, width = 12)
 
