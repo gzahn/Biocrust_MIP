@@ -118,10 +118,9 @@ dat %>%
 ggsave("./output/figs/18S_Species_Richness_Boxplot_by_Crust_and_Invasion.png",height = 8,width = 8)
 
 
-dat %>% 
-  lmer(data=.,formula=species_richness ~ invasion * crust + (1|site)) %>% 
-  summary
-
+m <- dat %>% 
+  lmer(data=.,formula=species_richness ~ invasion * crust + (1|site))
+equatiomatic::extract_eq(m,wrap = TRUE)
 
 # BARPLOTS ####
 ps_spp %>% 
