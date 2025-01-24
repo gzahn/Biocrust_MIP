@@ -146,4 +146,8 @@ spp_legend <- ggpubr::get_legend(spp_plot,position = 'right') %>% ggpubr::as_ggp
 p1 <- spp_plot + theme(legend.position = 'none')
 
 p1 / spp_legend
-ggsave("./output/figs/18S_Barplot_by_site-invasion_spp-level.png",height = 14, width = 18)
+ggsave("./output/figs/18S_Barplot_by_site-invasion_spp-level.png",height = 14, width = 22)
+p1
+ggsave("./output/figs/18S_Barplot_by_site-invasion_spp-level_part1.png",height = 10, width = 18)
+spp_legend
+ggsave("./output/figs/18S_Barplot_by_site-invasion_spp-level_part2.png",height = 8, width = 22)
